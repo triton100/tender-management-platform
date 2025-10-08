@@ -143,8 +143,8 @@ export default function DashboardPage() {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyTenders}>
-                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <XAxis dataKey="month" stroke="#9CA3AF" fontSize={12} />
+                    <YAxis stroke="#9CA3AF" fontSize={12} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
                     <Bar dataKey="tenders" fill="#3B82F6" radius={[4, 4, 0, 0]} name="Tenders Received" />
@@ -212,14 +212,8 @@ export default function DashboardPage() {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={winRateData} layout="vertical">
-                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis
-                      dataKey="category"
-                      type="category"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                      width={150}
-                    />
+                    <XAxis type="number" stroke="#9CA3AF" fontSize={12} />
+                    <YAxis dataKey="category" type="category" stroke="#9CA3AF" fontSize={12} width={150} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="winRate" fill="#F59E0B" radius={[0, 4, 4, 0]} name="Win Rate %" />
                   </BarChart>

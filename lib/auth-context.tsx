@@ -1,80 +1,123 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 import type { User } from "./types"
 
 interface AuthContextType {
   user: User | null
+  supabaseUser: SupabaseUser | null
   login: (email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Mock users for demonstration (replace with real Supabase auth later)
-const MOCK_USERS: Record<string, { password: string; user: User }> = {
-  "manager@brightinnovation.co.za": {
-    password: "demo123",
-    user: {
-      id: "1",
-      email: "manager@brightinnovation.co.za",
-      name: "Sarah Johnson",
-      role: "BidManager",
-      created_at: new Date().toISOString(),
-    },
-  },
-  "user@brightinnovation.co.za": {
-    password: "demo123",
-    user: {
-      id: "2",
-      email: "user@brightinnovation.co.za",
-      name: "Michael Chen",
-      role: "BidUser",
-      created_at: new Date().toISOString(),
-    },
-  },
-  "exec@brightinnovation.co.za": {
-    password: "demo123",
-    user: {
-      id: "3",
-      email: "exec@brightinnovation.co.za",
-      name: "Linda Mbeki",
-      role: "Executive",
-      created_at: new Date().toISOString(),
-    },
-  },
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClient()
 
   useEffect(() => {
-    // Check for stored session
-    const storedUser = localStorage.getItem("tender_portal_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    const initAuth = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          setSupabaseUser(session.user)
+          // Fetch user profile from database
+          const { data: profile } = await supabase.from("users").select("*").eq("id", session.user.id).single()
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              email: profile.email,
+              name: profile.full_name || session.user.email?.split("@")[0] || "User",
+              role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
+              created_at: profile.created_at,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error initializing auth:", error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    setIsLoading(false)
-  }, [])
+
+    initAuth()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[v0] Auth state changed:", event)
+
+      if (session?.user) {
+        setSupabaseUser(session.user)
+        // Fetch user profile
+        const { data: profile } = await supabase.from("users").select("*").eq("id", session.user.id).single()
+
+        if (profile) {
+          setUser({
+            id: profile.id,
+            email: profile.email,
+            name: profile.full_name || session.user.email?.split("@")[0] || "User",
+            role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
+            created_at: profile.created_at,
+          })
+        }
+      } else {
+        setSupabaseUser(null)
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
 
   const login = async (email: string, password: string) => {
-    const mockUser = MOCK_USERS[email]
-    if (!mockUser || mockUser.password !== password) {
-      throw new Error("Invalid email or password")
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      throw new Error(error.message)
     }
 
-    setUser(mockUser.user)
-    localStorage.setItem("tender_portal_user", JSON.stringify(mockUser.user))
+    if (data.user) {
+      setSupabaseUser(data.user)
+      // Fetch user profile
+      const { data: profile } = await supabase.from("users").select("*").eq("id", data.user.id).single()
+
+      if (profile) {
+        setUser({
+          id: profile.id,
+          email: profile.email,
+          name: profile.full_name || data.user.email?.split("@")[0] || "User",
+          role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
+          created_at: profile.created_at,
+        })
+      }
+    }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem("tender_portal_user")
+    setSupabaseUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, supabaseUser, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

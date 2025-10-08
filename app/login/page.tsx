@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,23 +12,65 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Building2, AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
+  const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
+      setError(err instanceof Error ? err.message : "Sign in failed")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+        },
+      })
+
+      if (error) throw error
+
+      setError("")
+      alert("Success! Please check your email to confirm your account before signing in.")
+      setIsSignUp(false)
+      setPassword("")
+      setConfirmPassword("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed")
     } finally {
       setIsLoading(false)
     }
@@ -48,7 +89,7 @@ export default function LoginPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -74,6 +115,21 @@ export default function LoginPage() {
               />
             </div>
 
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -82,24 +138,51 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? (isSignUp ? "Creating account..." : "Signing in...") : isSignUp ? "Sign Up" : "Sign In"}
             </Button>
 
-            <div className="rounded-lg bg-muted p-4 text-sm">
-              <p className="mb-2 font-medium text-foreground">Demo Accounts:</p>
-              <div className="space-y-1 text-muted-foreground">
+            <div className="text-center text-sm">
+              {isSignUp ? (
                 <p>
-                  <span className="font-medium">Bid Manager:</span> manager@brightinnovation.co.za
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSignUp(false)
+                      setError("")
+                      setConfirmPassword("")
+                    }}
+                    className="text-primary underline underline-offset-4 hover:text-primary/80"
+                  >
+                    Sign In
+                  </button>
                 </p>
+              ) : (
                 <p>
-                  <span className="font-medium">Bid User:</span> user@brightinnovation.co.za
+                  Don't have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSignUp(true)
+                      setError("")
+                    }}
+                    className="text-primary underline underline-offset-4 hover:text-primary/80"
+                  >
+                    Sign Up
+                  </button>
                 </p>
-                <p>
-                  <span className="font-medium">Executive:</span> exec@brightinnovation.co.za
-                </p>
-                <p className="mt-2 text-xs">Password for all: demo123</p>
-              </div>
+              )}
             </div>
+
+            {!isSignUp && (
+              <div className="rounded-lg bg-muted p-4 text-sm">
+                <p className="mb-2 font-medium text-foreground">Getting Started:</p>
+                <div className="space-y-1 text-muted-foreground">
+                  <p>Click "Sign Up" above to create a new account.</p>
+                  <p className="text-xs mt-2">You'll receive a confirmation email before you can sign in.</p>
+                </div>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>

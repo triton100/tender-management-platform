@@ -1,0 +1,12 @@
+-- This script will be run after users sign up through the app
+-- It creates sample data for testing
+
+-- Note: User IDs will be created by Supabase Auth when users sign up
+-- For now, we'll insert some sample tenders that don't require user references
+
+INSERT INTO public.tenders (reference, title, description, issuing_department, category, value, location, published_date, closing_date, priority, source_url) VALUES
+('GT-2024-IT-001', 'Information Technology Infrastructure Upgrade for Government Offices', 'Comprehensive IT infrastructure modernization including servers, networking equipment, and security systems for multiple government facilities across Gauteng province.', 'Gauteng Department of Infrastructure Development', 'Technology', 25000000.00, 'Gauteng', NOW() - INTERVAL '5 days', NOW() + INTERVAL '30 days', 'high', 'https://etenders.gov.za'),
+('NT-2024-DIGITAL-004', 'Digital Transformation Consulting Services', 'Strategic consulting services for digital transformation initiatives across National Treasury departments, including process optimization and technology roadmap development.', 'National Treasury', 'IT Consultancy', 22000000.00, 'Gauteng', NOW() - INTERVAL '3 days', NOW() + INTERVAL '35 days', 'high', 'https://etenders.gov.za'),
+('WC-2024-CYBER-007', 'Cybersecurity Assessment and Implementation', 'Comprehensive cybersecurity audit and implementation of security measures for Western Cape provincial government systems and networks.', 'Western Cape Department of the Premier', 'Cybersecurity', 18500000.00, 'Western Cape', NOW() - INTERVAL '7 days', NOW() + INTERVAL '25 days', 'high', 'https://etenders.gov.za'),
+('KZN-2024-CLOUD-012', 'Cloud Infrastructure Migration Services', 'Migration of legacy systems to cloud infrastructure for KwaZulu-Natal provincial departments, including training and support.', 'KZN Department of Economic Development', 'Cloud Services', 15000000.00, 'KwaZulu-Natal', NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days', 'medium', 'https://etenders.gov.za'),
+('EC-2024-SOFTWARE-015', 'Custom Software Development for Healthcare Management', 'Development of integrated healthcare management system for Eastern Cape health facilities, including patient records and inventory management.', 'Eastern Cape Department of Health', 'Software Development', 32000000.00, 'Eastern Cape', NOW() - INTERVAL '2 days', NOW() + INTERVAL '45 days', 'high', 'https://etenders.gov.za');
