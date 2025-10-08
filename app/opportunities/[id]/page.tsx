@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +11,6 @@ import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { AIQualificationCard } from "@/components/ai-qualification-card"
-import { MOCK_OPPORTUNITIES, MOCK_TASKS, MOCK_COMPLIANCE } from "@/lib/mock-data"
 import {
   ArrowLeft,
   Calendar,
@@ -28,13 +27,45 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+type Opportunity = any // Use proper type from lib/types.ts
+type Task = any
+type ComplianceItem = any
+
 export default function OpportunityDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState("overview")
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [compliance, setCompliance] = useState<ComplianceItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // In a real app, this would fetch from the API
-  const opportunity = MOCK_OPPORTUNITIES.find((o) => o.id === params.id)
-  const tasks = MOCK_TASKS.filter((t) => t.opportunity_id === params.id)
-  const compliance = MOCK_COMPLIANCE.filter((c) => c.opportunity_id === params.id)
+  useEffect(() => {
+    Promise.all([
+      fetch(`/api/opportunities?id=${params.id}`).then((res) => res.json()),
+      fetch(`/api/tasks?opportunity_id=${params.id}`).then((res) => res.json()),
+      // Compliance endpoint would go here when implemented
+    ])
+      .then(([oppData, tasksData]) => {
+        const foundOpp = Array.isArray(oppData) ? oppData.find((o: any) => o.id === params.id) : oppData
+        setOpportunity(foundOpp || null)
+        setTasks(tasksData || [])
+        setCompliance([]) // Empty for now
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("[v0] Failed to fetch opportunity data:", err)
+        setLoading(false)
+      })
+  }, [params.id])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Loading opportunity...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!opportunity) {
     return (

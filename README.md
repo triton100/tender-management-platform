@@ -140,4 +140,4 @@ Proprietary - Bright Innovation Technical Solutions
 
 ## Support
 
-For support, email sphamandla@bitstech.co.za
+For support, email support@brightinnovation.co.za

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { AIQualification } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -20,17 +20,40 @@ import {
   Target,
 } from "lucide-react"
 import Link from "next/link"
-import { MOCK_TENDERS } from "@/lib/mock-data"
 
-const fetcher = (url: string) => fetch(url, { method: "POST" }).then((res) => res.json())
+type Tender = {
+  id: string
+  tender_number: string
+  title: string
+  description: string
+  issuing_department: string
+  location: string
+  category: string
+  closing_date: string
+  value_estimate?: number
+  source_url?: string
+}
 
 export default function TenderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [isQualifying, setIsQualifying] = useState(false)
   const [qualification, setQualification] = useState<AIQualification | null>(null)
+  const [tender, setTender] = useState<Tender | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // In a real app, this would fetch from the API
-  const tender = MOCK_TENDERS.find((t) => t.id === params.id)
+  useEffect(() => {
+    fetch(`/api/tenders?id=${params.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const foundTender = Array.isArray(data) ? data.find((t: Tender) => t.id === params.id) : data
+        setTender(foundTender || null)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("[v0] Failed to fetch tender:", err)
+        setLoading(false)
+      })
+  }, [params.id])
 
   const handleQualify = async () => {
     setIsQualifying(true)
@@ -50,6 +73,16 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
   const handleCreateOpportunity = () => {
     // In a real app, this would create an opportunity in the database
     router.push("/opportunities")
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Loading tender...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!tender) {

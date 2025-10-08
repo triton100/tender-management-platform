@@ -1,15 +1,47 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { MOCK_OPPORTUNITIES } from "@/lib/mock-data"
 import { Calendar, DollarSign, Target, TrendingUp, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+type Opportunity = {
+  id: string
+  tender: {
+    tender_number: string
+    title: string
+    issuing_department: string
+    closing_date: string
+    value_estimate?: number
+  }
+  status: string
+  win_probability: number
+  ai_qualification?: {
+    match_score: number
+  }
+}
+
 export default function OpportunitiesPage() {
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch("/api/opportunities")
+      .then((res) => res.json())
+      .then((data) => {
+        setOpportunities(data)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("[v0] Failed to fetch opportunities:", err)
+        setLoading(false)
+      })
+  }, [])
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-ZA", {
       style: "currency",
@@ -42,6 +74,18 @@ export default function OpportunitiesPage() {
     return days
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-secondary/30">
+        <div className="mx-auto max-w-7xl p-6">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading opportunities...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-secondary/30">
       <div className="mx-auto max-w-7xl p-6">
@@ -63,7 +107,7 @@ export default function OpportunitiesPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Active Opportunities</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">{MOCK_OPPORTUNITIES.length}</div>
+              <div className="text-2xl font-bold text-foreground">{opportunities.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -72,7 +116,7 @@ export default function OpportunitiesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {formatCurrency(MOCK_OPPORTUNITIES.reduce((sum, opp) => sum + (opp.tender.value_estimate || 0), 0))}
+                {formatCurrency(opportunities.reduce((sum, opp) => sum + (opp.tender.value_estimate || 0), 0))}
               </div>
             </CardContent>
           </Card>
@@ -82,9 +126,9 @@ export default function OpportunitiesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {Math.round(
-                  MOCK_OPPORTUNITIES.reduce((sum, opp) => sum + opp.win_probability, 0) / MOCK_OPPORTUNITIES.length,
-                )}
+                {opportunities.length > 0
+                  ? Math.round(opportunities.reduce((sum, opp) => sum + opp.win_probability, 0) / opportunities.length)
+                  : 0}
                 %
               </div>
             </CardContent>
@@ -95,7 +139,7 @@ export default function OpportunitiesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {MOCK_OPPORTUNITIES.filter((opp) => getDaysUntilClosing(opp.tender.closing_date) <= 7).length}
+                {opportunities.filter((opp) => getDaysUntilClosing(opp.tender.closing_date) <= 7).length}
               </div>
             </CardContent>
           </Card>
@@ -103,7 +147,7 @@ export default function OpportunitiesPage() {
 
         {/* Opportunities List */}
         <div className="space-y-4">
-          {MOCK_OPPORTUNITIES.map((opportunity) => {
+          {opportunities.map((opportunity) => {
             const statusConfig = getStatusConfig(opportunity.status)
             const daysUntilClosing = getDaysUntilClosing(opportunity.tender.closing_date)
 
@@ -186,7 +230,7 @@ export default function OpportunitiesPage() {
           })}
         </div>
 
-        {MOCK_OPPORTUNITIES.length === 0 && (
+        {opportunities.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <Target className="mx-auto h-12 w-12 text-muted-foreground" />

@@ -1,16 +1,39 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { MOCK_OPPORTUNITIES, MOCK_TENDERS, MOCK_TASKS } from "@/lib/mock-data"
 import { TrendingUp, DollarSign, Target, Clock, CheckCircle2, AlertCircle, Inbox, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { Bar, BarChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 
 export default function DashboardPage() {
+  const [opportunities, setOpportunities] = useState<any[]>([])
+  const [tenders, setTenders] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/opportunities").then((res) => res.json()),
+      fetch("/api/tenders").then((res) => res.json()),
+      fetch("/api/tasks").then((res) => res.json()),
+    ])
+      .then(([oppsData, tendersData, tasksData]) => {
+        setOpportunities(oppsData || [])
+        setTenders(tendersData || [])
+        setTasks(tasksData || [])
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("[v0] Failed to fetch dashboard data:", err)
+        setLoading(false)
+      })
+  }, [])
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-ZA", {
       style: "currency",
@@ -21,13 +44,15 @@ export default function DashboardPage() {
   }
 
   // Calculate metrics
-  const totalOpportunities = MOCK_OPPORTUNITIES.length
-  const totalValue = MOCK_OPPORTUNITIES.reduce((sum, opp) => sum + (opp.tender.value_estimate || 0), 0)
+  const totalOpportunities = opportunities.length
+  const totalValue = opportunities.reduce((sum, opp) => sum + (opp.tender?.value_estimate || 0), 0)
   const avgWinProbability =
-    MOCK_OPPORTUNITIES.reduce((sum, opp) => sum + opp.win_probability, 0) / MOCK_OPPORTUNITIES.length
-  const newTenders = MOCK_TENDERS.filter((t) => t.status === "new").length
-  const completedTasks = MOCK_TASKS.filter((t) => t.status === "done").length
-  const totalTasks = MOCK_TASKS.length
+    opportunities.length > 0
+      ? opportunities.reduce((sum, opp) => sum + (opp.win_probability || 0), 0) / opportunities.length
+      : 0
+  const newTenders = tenders.filter((t) => t.status === "new").length
+  const completedTasks = tasks.filter((t) => t.status === "done").length
+  const totalTasks = tasks.length
   const taskCompletionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
   // Chart data
@@ -53,6 +78,18 @@ export default function DashboardPage() {
     { category: "Cybersecurity", winRate: 80, bids: 6 },
     { category: "Education Tech", winRate: 45, bids: 4 },
   ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-7xl p-6">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -261,7 +298,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <span className="text-2xl font-bold text-foreground">
-                      {MOCK_TASKS.filter((t) => t.status === "in-progress").length}
+                      {tasks.filter((t) => t.status === "in-progress").length}
                     </span>
                   </div>
 
@@ -274,7 +311,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <span className="text-2xl font-bold text-foreground">
-                      {MOCK_TASKS.filter((t) => t.status === "todo").length}
+                      {tasks.filter((t) => t.status === "todo").length}
                     </span>
                   </div>
                 </div>
@@ -291,7 +328,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {MOCK_OPPORTUNITIES.map((opp) => (
+              {opportunities.slice(0, 3).map((opp) => (
                 <div
                   key={opp.id}
                   className="flex items-center justify-between rounded-lg border border-border p-4 bg-card"
@@ -299,19 +336,21 @@ export default function DashboardPage() {
                   <div className="flex-1">
                     <div className="mb-1 flex items-center gap-2">
                       <Badge variant="outline" className="font-mono text-xs">
-                        {opp.tender.tender_number}
+                        {opp.tender?.tender_number || "N/A"}
                       </Badge>
                       <Badge className="bg-primary text-primary-foreground">Preparing</Badge>
                     </div>
-                    <h4 className="font-medium text-foreground">{opp.tender.title}</h4>
-                    <p className="mt-1 text-sm text-muted-foreground">{opp.tender.issuing_department}</p>
+                    <h4 className="font-medium text-foreground">{opp.tender?.title || "Untitled"}</h4>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {opp.tender?.issuing_department || "Unknown Department"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-sm font-medium text-foreground">
-                        {opp.tender.value_estimate ? formatCurrency(opp.tender.value_estimate) : "N/A"}
+                        {opp.tender?.value_estimate ? formatCurrency(opp.tender.value_estimate) : "N/A"}
                       </p>
-                      <p className="text-xs text-muted-foreground">Win Prob: {opp.win_probability}%</p>
+                      <p className="text-xs text-muted-foreground">Win Prob: {opp.win_probability || 0}%</p>
                     </div>
                     <Link href={`/opportunities/${opp.id}`}>
                       <Button variant="outline">
@@ -322,6 +361,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
+              {opportunities.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No opportunities yet</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
