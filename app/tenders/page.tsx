@@ -1,13 +1,15 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import useSWR from "swr"
-import type { Tender } from "@/lib/types"
+import type { ExternalTender } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, RefreshCw, Eye, Check, X, Download, FileText, Upload } from "lucide-react"
+import { Search, RefreshCw, Eye, Check, X, FileText, Upload } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -25,6 +27,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json())
 export default function TendersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [aiFilter, setAiFilter] = useState("all")
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [uploadData, setUploadData] = useState({
     tenderNumber: "",
@@ -34,22 +37,24 @@ export default function TendersPage() {
     description: "",
     value: "",
   })
+  const [uploadFiles, setUploadFiles] = useState<File[]>([])
 
-  const { data: tenders, error, isLoading, mutate } = useSWR<Tender[]>("/api/tenders", fetcher)
+  const { data: tenders, error, isLoading, mutate } = useSWR<ExternalTender[]>("/api/tenders", fetcher)
 
   const filteredTenders = tenders?.filter((tender) => {
     const matchesSearch =
       searchQuery === "" ||
-      tender.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tender.tender_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tender.issuing_department.toLowerCase().includes(searchQuery.toLowerCase())
+      tender.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tender.tender_No.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tender.department.toLowerCase().includes(searchQuery.toLowerCase())
 
-    return matchesSearch
+    const matchesAI =
+      aiFilter === "all" ||
+      (aiFilter === "relevant" && tender.ai_label === 1) ||
+      (aiFilter === "irrelevant" && tender.ai_label === 0)
+
+    return matchesSearch && matchesAI
   })
-
-  const formatCurrency = (amount: number) => {
-    return `R ${(amount / 1000000).toFixed(1)}M`
-  }
 
   const getDaysUntilClosing = (closingDate: string) => {
     const days = Math.ceil((new Date(closingDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -57,8 +62,8 @@ export default function TendersPage() {
   }
 
   const handleUpload = () => {
-    console.log("[v0] Uploading tender:", uploadData)
-    // In production, this would POST to an API endpoint
+    console.log("[v0] Uploading tender:", uploadData, "Files:", uploadFiles)
+    // In production, this would POST to an API endpoint with FormData
     setIsUploadOpen(false)
     setUploadData({
       tenderNumber: "",
@@ -68,8 +73,14 @@ export default function TendersPage() {
       description: "",
       value: "",
     })
-    // Refresh the tender list
+    setUploadFiles([])
     mutate()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setUploadFiles(Array.from(e.target.files))
+    }
   }
 
   return (
@@ -81,7 +92,9 @@ export default function TendersPage() {
               <FileText className="h-6 w-6 text-foreground" />
               <h1 className="text-2xl font-semibold text-foreground">Tender Inbox</h1>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">New tender opportunities awaiting qualification</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {filteredTenders?.length || 0} tender opportunities from eTenders Portal
+            </p>
           </div>
           <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
             <DialogTrigger asChild>
@@ -154,6 +167,28 @@ export default function TendersPage() {
                     onChange={(e) => setUploadData({ ...uploadData, description: e.target.value })}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="documents">Supporting Documents</Label>
+                  <Input
+                    id="documents"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.xls,.xlsx"
+                    onChange={handleFileChange}
+                    className="cursor-pointer"
+                  />
+                  {uploadFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {uploadFiles.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <FileText className="h-4 w-4" />
+                          <span>{file.name}</span>
+                          <span className="text-xs">({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsUploadOpen(false)}>
@@ -185,34 +220,25 @@ export default function TendersPage() {
                 className="pl-10"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={aiFilter} onValueChange={setAiFilter}>
               <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="AI Relevance" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tenders</SelectItem>
+                <SelectItem value="relevant">Relevant Only</SelectItem>
+                <SelectItem value="irrelevant">Irrelevant Only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="Services: Electrical">Services: Electrical</SelectItem>
                 <SelectItem value="Technology">Technology</SelectItem>
                 <SelectItem value="IT Consultancy">IT Consultancy</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Min Confidence" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Confidence Levels</SelectItem>
-                <SelectItem value="high">High (8+)</SelectItem>
-                <SelectItem value="medium">Medium (5-7)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Deadline" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Deadlines</SelectItem>
-                <SelectItem value="urgent">Urgent (7 days)</SelectItem>
-                <SelectItem value="soon">Soon (30 days)</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={() => mutate()} disabled={isLoading} className="md:w-auto">
@@ -227,6 +253,12 @@ export default function TendersPage() {
           </div>
         )}
 
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-red-600">
+            Failed to load tenders. Please try again.
+          </div>
+        )}
+
         {filteredTenders && filteredTenders.length > 0 && (
           <div className="overflow-hidden rounded-lg border bg-card">
             <table className="w-full">
@@ -234,86 +266,85 @@ export default function TendersPage() {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Reference</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Tender Details</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Value & Location</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Location</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Documents</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Match Score</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">AI Relevance</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Deadline</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filteredTenders.map((tender) => {
-                  const days = getDaysUntilClosing(tender.closing_date)
-                  const matchScore = Math.floor(Math.random() * 3) + 8 // Mock score 8-10
+                  const days = getDaysUntilClosing(tender.closing_Date)
+                  const isRelevant = tender.ai_label === 1
 
                   return (
                     <tr key={tender.id} className="hover:bg-muted/30">
                       <td className="px-4 py-4">
                         <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
-                          {tender.tender_number}
+                          {tender.tender_No}
                         </Badge>
                         <div className="mt-1.5">
-                          <a
-                            href={tender.source_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            etenders.gov.za-representative
-                          </a>
+                          <span className="text-xs text-muted-foreground">etenders.gov.za</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="max-w-md">
-                          <p className="font-medium text-foreground text-balance">{tender.title}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{tender.issuing_department}</p>
+                          <p className="font-medium text-foreground text-balance line-clamp-2">{tender.description}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{tender.department}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             <Badge variant="secondary" className="text-xs">
-                              {tender.category || "Technology"}
+                              {tender.category}
                             </Badge>
-                            <Badge variant="destructive" className="text-xs">
-                              High Priority
+                            <Badge variant="secondary" className="text-xs">
+                              {tender.type}
                             </Badge>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-semibold text-foreground">
-                          {tender.value_estimate ? formatCurrency(tender.value_estimate) : "R 25,000,000"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{tender.location}</p>
+                        <p className="text-sm text-foreground">{tender.province}</p>
+                        <p className="text-xs text-muted-foreground">{tender.town}</p>
                       </td>
                       <td className="px-4 py-4">
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">3 document(s)</p>
-                          <a href="#" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                            <Download className="h-3 w-3" />
-                            Technical Spec...
-                          </a>
-                          <a href="#" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                            <Download className="h-3 w-3" />
-                            Bid Document.do...
-                          </a>
-                          <button className="text-xs text-muted-foreground hover:text-foreground">+1 more</button>
+                          <p className="text-sm font-medium text-foreground">
+                            {tender.supportDocument?.length || 0} document(s)
+                          </p>
+                          {tender.supportDocument?.slice(0, 2).map((doc) => (
+                            <div key={doc.supportDocumentID} className="flex items-center gap-1 text-xs text-blue-600">
+                              <FileText className="h-3 w-3" />
+                              <span className="truncate max-w-[120px]">{doc.fileName}</span>
+                            </div>
+                          ))}
+                          {tender.supportDocument?.length > 2 && (
+                            <button className="text-xs text-muted-foreground hover:text-foreground">
+                              +{tender.supportDocument.length - 2} more
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                          <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full bg-green-500" style={{ width: `${(matchScore / 10) * 100}%` }} />
+                          <div
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              isRelevant ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {isRelevant ? "Relevant" : "Irrelevant"}
                           </div>
-                          <span className="text-sm font-semibold text-foreground">{matchScore}/10</span>
                         </div>
+                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{tender.ai_reasoning}</p>
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm font-medium text-foreground">
-                          {new Date(tender.closing_date).toLocaleDateString("en-US", {
+                          {new Date(tender.closing_Date).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
                           })}
                         </p>
-                        <p className="text-sm text-green-600">• {days} days</p>
+                        <p className={`text-sm ${days <= 7 ? "text-red-600" : "text-green-600"}`}>• {days} days</p>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-2">
@@ -335,6 +366,14 @@ export default function TendersPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {filteredTenders && filteredTenders.length === 0 && !isLoading && (
+          <div className="rounded-lg border bg-card p-12 text-center">
+            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold text-foreground">No tenders found</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Try adjusting your filters or search query</p>
           </div>
         )}
       </div>

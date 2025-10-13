@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import type { AIQualification } from "@/lib/types"
+import type { ExternalTender, AIQualification } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -13,39 +13,29 @@ import {
   Building,
   Calendar,
   MapPin,
-  DollarSign,
-  ExternalLink,
   Sparkles,
   Loader2,
   Target,
+  FileText,
+  Download,
+  Phone,
+  Mail,
+  MapPinned,
 } from "lucide-react"
 import Link from "next/link"
-
-type Tender = {
-  id: string
-  tender_number: string
-  title: string
-  description: string
-  issuing_department: string
-  location: string
-  category: string
-  closing_date: string
-  value_estimate?: number
-  source_url?: string
-}
 
 export default function TenderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [isQualifying, setIsQualifying] = useState(false)
   const [qualification, setQualification] = useState<AIQualification | null>(null)
-  const [tender, setTender] = useState<Tender | null>(null)
+  const [tender, setTender] = useState<ExternalTender | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/tenders?id=${params.id}`)
+    fetch(`/api/tenders`)
       .then((res) => res.json())
-      .then((data) => {
-        const foundTender = Array.isArray(data) ? data.find((t: Tender) => t.id === params.id) : data
+      .then((data: ExternalTender[]) => {
+        const foundTender = data.find((t) => t.id.toString() === params.id)
         setTender(foundTender || null)
         setLoading(false)
       })
@@ -71,16 +61,13 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
   }
 
   const handleCreateOpportunity = () => {
-    // In a real app, this would create an opportunity in the database
     router.push("/opportunities")
   }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading tender...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -101,21 +88,15 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
     )
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ZA", {
-      style: "currency",
-      currency: "ZAR",
-      minimumFractionDigits: 0,
-    }).format(amount)
-  }
-
   const getDaysUntilClosing = (closingDate: string) => {
     const days = Math.ceil((new Date(closingDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     return days
   }
 
+  const isRelevant = tender.ai_label === 1
+
   return (
-    <div className="min-h-screen bg-secondary/30">
+    <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl p-6">
         {/* Header */}
         <div className="mb-6">
@@ -128,14 +109,17 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
 
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="font-mono">
-                  {tender.tender_number}
+                  {tender.tender_No}
                 </Badge>
                 <Badge>{tender.category}</Badge>
-                <Badge variant="secondary">Closes in {getDaysUntilClosing(tender.closing_date)} days</Badge>
+                <Badge variant="secondary">Closes in {getDaysUntilClosing(tender.closing_Date)} days</Badge>
+                <Badge className={isRelevant ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
+                  {isRelevant ? "AI: Relevant" : "AI: Irrelevant"}
+                </Badge>
               </div>
-              <h1 className="text-3xl font-semibold text-foreground text-balance">{tender.title}</h1>
+              <h1 className="text-3xl font-semibold text-foreground text-balance">{tender.description}</h1>
             </div>
             {!qualification && (
               <Button size="lg" onClick={handleQualify} disabled={isQualifying}>
@@ -161,19 +145,91 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
           </div>
         </div>
 
-        {/* Tender Details */}
-        <div className="mb-6 grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Main Content */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* AI Reasoning */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Sparkles className="h-5 w-5" />
+                  AI Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="leading-relaxed text-foreground">{tender.ai_reasoning}</p>
+              </CardContent>
+            </Card>
+
+            {/* Description */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-foreground">Tender Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="leading-relaxed text-foreground">{tender.description}</p>
+                <p className="leading-relaxed text-foreground whitespace-pre-wrap">{tender.description}</p>
               </CardContent>
             </Card>
+
+            {/* Supporting Documents */}
+            {tender.supportDocument && tender.supportDocument.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-foreground">Supporting Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {tender.supportDocument.map((doc) => (
+                      <div
+                        key={doc.supportDocumentID}
+                        className="flex items-center justify-between rounded-lg border bg-muted/30 p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                          <div>
+                            <p className="font-medium text-foreground">{doc.fileName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Updated {new Date(doc.dateModified).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Briefing Session */}
+            {tender.briefingSession && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-foreground">Briefing Session</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={tender.briefingCompulsory ? "destructive" : "secondary"}>
+                        {tender.briefingCompulsory ? "Compulsory" : "Optional"}
+                      </Badge>
+                    </div>
+                    {tender.briefingVenue && (
+                      <div className="mt-3 rounded-lg bg-muted/50 p-3">
+                        <p className="text-sm font-medium text-foreground">Venue/Meeting Details:</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{tender.briefingVenue}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
+          {/* Sidebar */}
           <div className="space-y-4">
             <Card>
               <CardHeader>
@@ -183,25 +239,37 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
                 <div className="flex items-start gap-3">
                   <Building className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Issuing Department</p>
-                    <p className="text-sm font-medium text-foreground">{tender.issuing_department}</p>
+                    <p className="text-xs text-muted-foreground">Department</p>
+                    <p className="text-sm font-medium text-foreground">{tender.department}</p>
                   </div>
                 </div>
                 <Separator />
                 <div className="flex items-start gap-3">
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Location</p>
-                    <p className="text-sm font-medium text-foreground">{tender.location}</p>
+                    <p className="text-xs text-muted-foreground">Province</p>
+                    <p className="text-sm font-medium text-foreground">{tender.province}</p>
                   </div>
                 </div>
                 <Separator />
                 <div className="flex items-start gap-3">
-                  <DollarSign className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Estimated Value</p>
+                    <p className="text-xs text-muted-foreground">Delivery Location</p>
+                    <p className="text-sm font-medium text-foreground">{tender.delivery}</p>
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Published</p>
                     <p className="text-sm font-medium text-foreground">
-                      {tender.value_estimate ? formatCurrency(tender.value_estimate) : "Not specified"}
+                      {new Date(tender.date_Published).toLocaleDateString("en-ZA", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
                     </p>
                   </div>
                 </div>
@@ -211,28 +279,69 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
                   <div className="flex-1">
                     <p className="text-xs text-muted-foreground">Closing Date</p>
                     <p className="text-sm font-medium text-foreground">
-                      {new Date(tender.closing_date).toLocaleDateString("en-ZA", {
+                      {new Date(tender.closing_Date).toLocaleDateString("en-ZA", {
                         weekday: "long",
                         year: "numeric",
                         month: "long",
                         day: "numeric",
                       })}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {new Date(tender.closing_Date).toLocaleTimeString("en-ZA", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
                   </div>
                 </div>
-                {tender.source_url && (
+              </CardContent>
+            </Card>
+
+            {/* Contact Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm text-foreground">Contact Person</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="font-medium text-foreground">{tender.contactPerson}</p>
+                </div>
+                <Separator />
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <a href={`mailto:${tender.email}`} className="text-sm text-blue-600 hover:underline">
+                    {tender.email}
+                  </a>
+                </div>
+                {tender.telephone && tender.telephone !== "N/A" && (
                   <>
                     <Separator />
-                    <a
-                      href={tender.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary hover:underline"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      View on eTenders portal
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <a href={`tel:${tender.telephone}`} className="text-sm text-blue-600 hover:underline">
+                        {tender.telephone}
+                      </a>
+                    </div>
                   </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Submission Type */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm text-foreground">Submission</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant={tender.eSubmission ? "default" : "secondary"}>
+                    {tender.eSubmission ? "Electronic Submission" : "Physical Submission"}
+                  </Badge>
+                </div>
+                {tender.twoEnvelopeSubmission && (
+                  <div className="mt-2">
+                    <Badge variant="outline">Two Envelope System</Badge>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -241,14 +350,14 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
 
         {/* AI Qualification Results */}
         {qualification && (
-          <div className="mb-6">
+          <div className="mt-6">
             <AIQualificationCard qualification={qualification} />
           </div>
         )}
 
         {/* Loading State */}
         {isQualifying && (
-          <Card className="border-primary/50 bg-primary/5">
+          <Card className="mt-6 border-primary/50 bg-primary/5">
             <CardContent className="py-12">
               <div className="flex flex-col items-center justify-center gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />

@@ -91,3 +91,44 @@ export interface ProposalSection {
   last_edited_by?: string
   last_edited_at?: string
 }
+
+export interface ExternalTenderDocument {
+  supportDocumentID: string
+  fileName: string
+  extension: string
+  tendersID: number
+  active: boolean
+  updatedBy: string
+  dateModified: string
+}
+
+export interface ExternalTender {
+  id: number
+  tender_No: string
+  description: string
+  category: string
+  type: string
+  organ_of_State: string
+  status: string
+  closing_Date: string
+  date_Published: string
+  compulsory_briefing_session: string | null
+  briefingVenue: string | null
+  streetname: string
+  surburb: string
+  town: string
+  code: string
+  contactPerson: string
+  email: string
+  telephone: string
+  fax: string
+  briefingSession: boolean
+  briefingCompulsory: boolean
+  validity: number
+  province: string
+  department: string
+  supportDocument: ExternalTenderDocument[]
+  ai_label: 0 | 1 // 0 = irrelevant, 1 = relevant
+  ai_reasoning: string
+  delivery: string
+}
