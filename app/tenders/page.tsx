@@ -41,7 +41,9 @@ export default function TendersPage() {
 
   const { data: tenders, error, isLoading, mutate } = useSWR<ExternalTender[]>("/api/tenders", fetcher)
 
-  const filteredTenders = tenders?.filter((tender) => {
+  const tendersArray = Array.isArray(tenders) ? tenders : []
+
+  const filteredTenders = tendersArray.filter((tender) => {
     const matchesSearch =
       searchQuery === "" ||
       tender.description.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -17,21 +17,35 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/opportunities").then((res) => res.json()),
-      fetch("/api/tenders").then((res) => res.json()),
-      fetch("/api/tasks").then((res) => res.json()),
-    ])
-      .then(([oppsData, tendersData, tasksData]) => {
-        setOpportunities(oppsData || [])
-        setTenders(tendersData || [])
-        setTasks(tasksData || [])
-        setLoading(false)
-      })
-      .catch((err) => {
+    const fetchData = async () => {
+      try {
+        const [oppsRes, tendersRes, tasksRes] = await Promise.all([
+          fetch("/api/opportunities").catch(() => ({ ok: false })),
+          fetch("/api/tenders").catch(() => ({ ok: false })),
+          fetch("/api/tasks").catch(() => ({ ok: false })),
+        ])
+
+        // Parse responses safely
+        const oppsData = oppsRes.ok ? await oppsRes.json().catch(() => []) : []
+        const tendersData = tendersRes.ok ? await tendersRes.json().catch(() => []) : []
+        const tasksData = tasksRes.ok ? await tasksRes.json().catch(() => []) : []
+
+        // Ensure all data is arrays
+        setOpportunities(Array.isArray(oppsData) ? oppsData : [])
+        setTenders(Array.isArray(tendersData) ? tendersData : [])
+        setTasks(Array.isArray(tasksData) ? tasksData : [])
+      } catch (err) {
         console.error("[v0] Failed to fetch dashboard data:", err)
+        // Set empty arrays on error
+        setOpportunities([])
+        setTenders([])
+        setTasks([])
+      } finally {
         setLoading(false)
-      })
+      }
+    }
+
+    fetchData()
   }, [])
 
   const formatCurrency = (amount: number) => {
