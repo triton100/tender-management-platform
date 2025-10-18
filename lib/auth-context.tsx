@@ -19,7 +19,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
+
+  const fetchAndSetUserProfile = async (authUser: SupabaseUser) => {
+    try {
+      const { data: profile, error } = await supabase.from("users").select("*").eq("id", authUser.id).maybeSingle()
+
+      if (error) {
+        console.error("[v0] Error fetching user profile:", error)
+      }
+
+      if (profile) {
+        setUser({
+          id: profile.id,
+          email: profile.email,
+          name: profile.full_name || authUser.email?.split("@")[0] || "User",
+          role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
+          created_at: profile.created_at,
+        })
+      } else {
+        setUser({
+          id: authUser.id,
+          email: authUser.email || "",
+          name: authUser.email?.split("@")[0] || "User",
+          role: "BidUser",
+          created_at: new Date().toISOString(),
+        })
+      }
+    } catch (error) {
+      console.error("[v0] Error in fetchAndSetUserProfile:", error)
+      setUser({
+        id: authUser.id,
+        email: authUser.email || "",
+        name: authUser.email?.split("@")[0] || "User",
+        role: "BidUser",
+        created_at: new Date().toISOString(),
+      })
+    }
+  }
 
   useEffect(() => {
     const initAuth = async () => {
@@ -30,33 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (session?.user) {
           setSupabaseUser(session.user)
-          const { data: profile, error } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle()
-
-          if (error) {
-            console.error("[v0] Error fetching user profile:", error)
-          }
-
-          if (profile) {
-            setUser({
-              id: profile.id,
-              email: profile.email,
-              name: profile.full_name || session.user.email?.split("@")[0] || "User",
-              role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
-              created_at: profile.created_at,
-            })
-          } else {
-            setUser({
-              id: session.user.id,
-              email: session.user.email || "",
-              name: session.user.email?.split("@")[0] || "User",
-              role: "BidUser",
-              created_at: new Date().toISOString(),
-            })
-          }
+          await fetchAndSetUserProfile(session.user)
         }
       } catch (error) {
         console.error("[v0] Error initializing auth:", error)
@@ -72,36 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[v0] Auth state changed:", event)
 
-      if (session?.user) {
+      if (event === "SIGNED_IN" && session?.user) {
         setSupabaseUser(session.user)
-        const { data: profile, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", session.user.id)
-          .maybeSingle()
-
-        if (error) {
-          console.error("[v0] Error fetching user profile:", error)
-        }
-
-        if (profile) {
-          setUser({
-            id: profile.id,
-            email: profile.email,
-            name: profile.full_name || session.user.email?.split("@")[0] || "User",
-            role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
-            created_at: profile.created_at,
-          })
-        } else {
-          setUser({
-            id: session.user.id,
-            email: session.user.email || "",
-            name: session.user.email?.split("@")[0] || "User",
-            role: "BidUser",
-            created_at: new Date().toISOString(),
-          })
-        }
-      } else {
+        await fetchAndSetUserProfile(session.user)
+      } else if (event === "SIGNED_OUT") {
         setSupabaseUser(null)
         setUser(null)
       }
@@ -110,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [])
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -120,37 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       throw new Error(error.message)
-    }
-
-    if (data.user) {
-      setSupabaseUser(data.user)
-      const { data: profile, error: profileError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", data.user.id)
-        .maybeSingle()
-
-      if (profileError) {
-        console.error("[v0] Error fetching user profile:", profileError)
-      }
-
-      if (profile) {
-        setUser({
-          id: profile.id,
-          email: profile.email,
-          name: profile.full_name || data.user.email?.split("@")[0] || "User",
-          role: profile.role === "admin" ? "Executive" : profile.role === "bid_manager" ? "BidManager" : "BidUser",
-          created_at: profile.created_at,
-        })
-      } else {
-        setUser({
-          id: data.user.id,
-          email: data.user.email || "",
-          name: data.user.email?.split("@")[0] || "User",
-          role: "BidUser",
-          created_at: new Date().toISOString(),
-        })
-      }
     }
   }
 
